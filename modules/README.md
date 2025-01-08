@@ -2,7 +2,7 @@
 
 This directory contains modules that can be dynamically loaded by D-Hub daemon.
 
-# Writing your own modules
+## Writing your own modules
 
 Every D-Hub module must implement two key functions: `load()` and `unload()`.
 The `load()` function initializes your module when D-Hub starts, while
@@ -37,3 +37,33 @@ handling macros and following a clear initialization sequence.
 Your module's interface methods will receive D-Bus messages that you can respond
 to. Use the sd-bus API to parse incoming messages and construct replies, similar
 to how the `method_echo()` function processes string arrays in the example.
+
+### Manual testing
+
+While developing, you may want to test your code manually from a terminal. You
+can do so using `dbus-send` and `dbus-monitor` CLIs.
+
+Calling a method:
+
+```
+dbus-send --session --type=method_call --print-reply \
+    --dest=dev.negrel.dhub /dev/negrel/dhub/echo \
+    dev.negrel.dhub.Echoer.Broadcast string:"foo"
+```
+
+Reading a property:
+
+```
+dbus-send --session --type=method_call --print-reply \
+    --dest=dev.negrel.dhub /dev/negrel/dhub/power \
+    org.freedesktop.DBus.Properties.Get \
+    string:"dev.negrel.dhub.Power" \
+    string:"Devices"
+```
+
+Subscribe to signals:
+
+```
+dbus-monitor --session \
+    "type='signal',interface='dev.negrel.dhub.Echoer',path='/dev/negrel/dhub/echo'"
+```

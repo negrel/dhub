@@ -9,7 +9,7 @@
 void dhub_start(dhub_state_t *dhub) {
   // Load power_udev module.
   const char *err_msg = NULL;
-  char *modname = "echo";
+  char *modname = "power_udev";
   if (dhub_load(dhub, modname, &err_msg) == -1) {
     LOG_FATAL("failed to load '%s' module: %s", modname, err_msg);
   }

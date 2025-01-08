@@ -6,6 +6,8 @@ MODULES_DIR := $(PROJECT_DIR)/modules
 CC := clang
 CFLAGS ?= -Wall -Wextra -Werror
 
+DEPS_CFLAGS := $(shell pkg-config --cflags --libs basu libuv libudev)
+
 ifeq ($(DEBUG), 1)
 	CFLAGS += -g -DMODDIR=\"$(BUILD_DIR)/modules\"
 else
@@ -16,15 +18,15 @@ SRCS := $(shell find $(PROJECT_DIR)/src -type f -name '*.c')
 
 CMD_DHUB_SRCS := $(shell find $(CMD_DIR)/dhub -type f -name '*.c')
 CMD_DHUB_CFLAGS := -I$(PROJECT_DIR)/cmd/dhub -I$(PROJECT_DIR)/include \
-	-I$(PROJECT_DIR)/src $(shell pkg-config --cflags --libs basu libuv)
+	-I$(PROJECT_DIR)/src $(DEPS_CFLAGS)
 
 .PHONY: all
 all: clean $(BUILD_DIR)/dhub
 
 dhub/%: $(BUILD_DIR)/dhub build/modules
-	$(BUILD_DIR)/dhub $*
+	valgrind --leak-check=full $(BUILD_DIR)/dhub $*
 
-build/modules: build/module/echo
+build/modules: build/module/echo build/module/power_udev
 
 build/module/%: $(BUILD_DIR)/modules/%.so
 	@true
@@ -58,14 +60,23 @@ $(BUILD_DIR)/dhub: $(BUILD_DIR) $(SRCS) $(CMD_DHUB_SRCS)
 		-I$(PROJECT_DIR)/cmd/dhub -I$(PROJECT_DIR)/include -I$(PROJECT_DIR)/src \
 		$(CMD_DHUB_SRCS) $(SRCS) \
 		$(CFLAGS) \
-		$(shell pkg-config --cflags --libs basu libuv) \
-		-o "$(BUILD_DIR)/dhub"
+		$(DEPS_CFLAGS) \
+		-o "$@"
 
-$(BUILD_DIR)/modules/%.so: $(BUILD_DIR)/modules
+$(BUILD_DIR)/modules/%.so: $(MODULES_DIR)/%.c $(BUILD_DIR)/modules
 	$(CC) \
-		-shared \
+		-shared -fPIC \
 		$(CFLAGS) \
 		-I$(PROJECT_DIR)/include \
-		$(shell pkg-config --cflags basu libuv) \
-		$(MODULES_DIR)/$*.c \
-		-o "$(BUILD_DIR)/modules/$*.so"
+		$(DEPS_CFLAGS) \
+		"$<" \
+		-o "$@"
+
+$(BUILD_DIR)/modules/power_udev.so: $(MODULES_DIR)/power/udev.c $(BUILD_DIR)/modules
+	$(CC) \
+		-shared -fPIC \
+		$(CFLAGS) \
+		-I$(PROJECT_DIR)/include -I$(PROJECT_DIR)/src \
+		$(DEPS_CFLAGS) \
+		"$<" \
+		-o "$@"

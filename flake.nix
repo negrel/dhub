@@ -20,6 +20,8 @@
                 basu
 
                 clang-tools
+                valgrind-light
+                udev
               ];
               LD_LIBRARY_PATH = "${lib.makeLibraryPath buildInputs}";
               DEBUG = 1;
