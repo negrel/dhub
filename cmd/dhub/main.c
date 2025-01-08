@@ -4,7 +4,7 @@
 #include <string.h>
 
 #include "debug.h"
-#define LOG_MODULE "cli"
+#define LOG_MODULE "dhub-main"
 #include "log.h"
 
 int start(int argc, char *argv[]);

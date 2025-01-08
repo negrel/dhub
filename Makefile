@@ -24,7 +24,7 @@ all: clean $(BUILD_DIR)/dhub
 dhub/%: $(BUILD_DIR)/dhub build/modules
 	$(BUILD_DIR)/dhub $*
 
-build/modules: build/module/ping
+build/modules: build/module/echo
 
 build/module/%: $(BUILD_DIR)/modules/%.so
 	@true
@@ -65,7 +65,7 @@ $(BUILD_DIR)/modules/%.so: $(BUILD_DIR)/modules
 	$(CC) \
 		-shared \
 		$(CFLAGS) \
-		-I$(PROJECT_DIR)/include -I$(PROJECT_DIR)/src \
+		-I$(PROJECT_DIR)/include \
 		$(shell pkg-config --cflags basu libuv) \
 		$(MODULES_DIR)/$*.c \
 		-o "$(BUILD_DIR)/modules/$*.so"

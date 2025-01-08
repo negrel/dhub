@@ -57,8 +57,8 @@ void dhub_init(dhub_state_t *dhub) {
            "failed to acquire D-BUS name");
 
   // Load ping module.
-  if (dhub_load(dhub, "ping", NULL) == -1) {
-    LOG_ERR("failed to load ping module");
+  if (dhub_load(dhub, "echo", NULL) == -1) {
+    LOG_ERR("failed to load echo module");
     abort();
   }
 }
