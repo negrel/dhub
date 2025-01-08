@@ -55,6 +55,11 @@ int dhub_load(dhub_state_t *dhub, const char *modname, const char **err);
 int dhub_unload(dhub_state_t *dhub, const char *modname);
 
 /**
+ * Close a D-Hub module after unloading it.
+ */
+void dhub_close(dhub_state_t *dhub, void *tag);
+
+/**
  * Getter for global D-Bus handle.
  */
 sd_bus *dhub_bus(dhub_state_t *dhub);
@@ -83,6 +88,11 @@ void log_errno_provided(enum log_class log_class, const char *module,
                         const char *file, int lineno, int _errno,
                         const char *fmt, ...);
 
+#define LOG_FATAL(...)                                                         \
+  do {                                                                         \
+    log_msg(LOG_CLASS_ERROR, LOG_MODULE, __FILE__, __LINE__, __VA_ARGS__);     \
+    abort();                                                                   \
+  } while (0)
 #define LOG_ERR(...)                                                           \
   log_msg(LOG_CLASS_ERROR, LOG_MODULE, __FILE__, __LINE__, __VA_ARGS__)
 #define LOG_ERRNO(...)                                                         \
