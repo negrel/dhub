@@ -1,8 +1,8 @@
 #ifndef HUB_H_INCLUDE
 #define HUB_H_INCLUDE
 
-#include <uv.h>
 #include <basu/sd-bus.h>
+#include <uv.h>
 
 /**
  * dhub_type_t define a data type. It is used to dynamically represent types

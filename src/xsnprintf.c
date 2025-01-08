@@ -35,20 +35,19 @@
  * - https://pubs.opengroup.org/onlinepubs/9699919799/functions/snprintf.html
  */
 static size_t xvsnprintf(char *restrict buf, size_t n,
-			 const char *restrict format, va_list ap)
-{
-	int len = vsnprintf(buf, n, format, ap);
-	if (unlikely(len < 0 || len >= (int)n)) {
-		FATAL_ERROR(__func__, (len < 0) ? errno : ENOBUFS);
-	}
-	return (size_t)len;
+                         const char *restrict format, va_list ap) {
+  int len = vsnprintf(buf, n, format, ap);
+  if (unlikely(len < 0 || len >= (int)n)) {
+    FATAL_ERROR(__func__, (len < 0) ? errno : ENOBUFS);
+  }
+  return (size_t)len;
 }
 
-size_t xsnprintf(char *restrict buf, size_t n, const char *restrict format, ...)
-{
-	va_list ap;
-	va_start(ap, format);
-	size_t len = xvsnprintf(buf, n, format, ap);
-	va_end(ap);
-	return len;
+size_t xsnprintf(char *restrict buf, size_t n, const char *restrict format,
+                 ...) {
+  va_list ap;
+  va_start(ap, format);
+  size_t len = xvsnprintf(buf, n, format, ap);
+  va_end(ap);
+  return len;
 }
