@@ -34,7 +34,7 @@ build/%: $(BUILD_DIR)/%
 
 .PHONY: clean
 clean:
-	rm -rf $(BUILD_DIR) compile_flags.txt
+	rm -rf $(BUILD_DIR)
 
 .PHONY: format
 format:
