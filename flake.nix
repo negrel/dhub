@@ -14,8 +14,16 @@
         in {
           devShells = {
             default = pkgs.mkShell rec {
-              buildInputs = with pkgs; [ pkg-config libuv indent basu ];
+              buildInputs = with pkgs; [
+                pkg-config
+                libuv
+                basu
+
+                clang-tools
+                indent
+              ];
               LD_LIBRARY_PATH = "${lib.makeLibraryPath buildInputs}";
+              DEBUG = 1;
             };
           };
         });
