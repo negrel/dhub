@@ -124,7 +124,7 @@ sd_bus *dhub_bus(dhub_state_t *state)
 	return state->bus;
 }
 
-const uv_loop_t *dhub_loop(dhub_state_t *state)
+uv_loop_t *dhub_loop(dhub_state_t *state)
 {
 	return &state->loop;
 }

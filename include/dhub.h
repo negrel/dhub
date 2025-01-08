@@ -55,6 +55,6 @@ int dhub_load(dhub_state_t *dhub, const char *modname, const char **err);
 int dhub_unload(dhub_state_t *dhub, const char *modname);
 
 sd_bus *dhub_bus(dhub_state_t *dhub);
-const uv_loop_t *dhub_loop(dhub_state_t *dhub);
+uv_loop_t *dhub_loop(dhub_state_t *dhub);
 
 #endif
