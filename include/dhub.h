@@ -1,5 +1,5 @@
-#ifndef HUB_H_INCLUDE
-#define HUB_H_INCLUDE
+#ifndef DHUB_H_INCLUDE
+#define DHUB_H_INCLUDE
 
 #include <basu/sd-bus.h>
 #include <uv.h>
@@ -54,7 +54,47 @@ int dhub_load(dhub_state_t *dhub, const char *modname, const char **err);
  */
 int dhub_unload(dhub_state_t *dhub, const char *modname);
 
+/**
+ * Getter for global D-Bus handle.
+ */
 sd_bus *dhub_bus(dhub_state_t *dhub);
+
+/**
+ * Getter for global libuv loop handle.
+ */
 uv_loop_t *dhub_loop(dhub_state_t *dhub);
+
+enum log_class {
+  LOG_CLASS_NONE,
+  LOG_CLASS_ERROR,
+  LOG_CLASS_WARNING,
+  LOG_CLASS_INFO,
+  LOG_CLASS_DEBUG,
+  LOG_CLASS_COUNT,
+};
+
+void log_msg(enum log_class log_class, const char *module, const char *file,
+             int lineno, const char *fmt, ...);
+
+void log_errno(enum log_class log_class, const char *module, const char *file,
+               int lineno, const char *fmt, ...);
+
+void log_errno_provided(enum log_class log_class, const char *module,
+                        const char *file, int lineno, int _errno,
+                        const char *fmt, ...);
+
+#define LOG_ERR(...)                                                           \
+  log_msg(LOG_CLASS_ERROR, LOG_MODULE, __FILE__, __LINE__, __VA_ARGS__)
+#define LOG_ERRNO(...)                                                         \
+  log_errno(LOG_CLASS_ERROR, LOG_MODULE, __FILE__, __LINE__, __VA_ARGS__)
+#define LOG_ERRNO_P(_errno, ...)                                               \
+  log_errno_provided(LOG_CLASS_ERROR, LOG_MODULE, __FILE__, __LINE__, _errno,  \
+                     __VA_ARGS__)
+#define LOG_WARN(...)                                                          \
+  log_msg(LOG_CLASS_WARNING, LOG_MODULE, __FILE__, __LINE__, __VA_ARGS__)
+#define LOG_INFO(...)                                                          \
+  log_msg(LOG_CLASS_INFO, LOG_MODULE, __FILE__, __LINE__, __VA_ARGS__)
+#define LOG_DBG(...)                                                           \
+  log_msg(LOG_CLASS_DEBUG, LOG_MODULE, __FILE__, __LINE__, __VA_ARGS__)
 
 #endif
