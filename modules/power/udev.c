@@ -1,3 +1,4 @@
+#include "basu/sd-bus.h"
 #include "string.h"
 #include <libudev.h>
 #include <stdbool.h>
@@ -8,28 +9,29 @@
 #include "dhub.h"
 #include "tllist.h"
 
-#define LOG_ERR_GOTO(err, msg, label)                                          \
+#define LOG_ERR_GOTO(err, label, fmt, ...)                                     \
   if (err) {                                                                   \
-    LOG_ERR("%s", msg);                                                        \
+    LOG_ERR(fmt, #__VA_ARGS__);                                                \
     goto label;                                                                \
   }
 
-#define SD_LOG_ERR(err, msg)                                                   \
+#define SD_LOG_ERR(err, fmt, ...)                                              \
   if (err < 0) {                                                               \
-    LOG_ERR("%s: %s", msg, strerror(-err));                                    \
+    LOG_ERR(fmt ": %s", ##__VA_ARGS__, strerror(-err));                        \
   }
 
-#define SD_LOG_ERR_GOTO(err, msg, label)                                       \
+#define SD_LOG_ERR_GOTO(err, label, fmt, ...)                                  \
   if (err < 0) {                                                               \
-    LOG_ERR("%s: %s", msg, strerror(-err));                                    \
+    LOG_ERR(fmt ": %s", ##__VA_ARGS__, strerror(-err));                        \
     goto label;                                                                \
   }
 
-#define UDEV_LOG_ERR_GOTO(err, msg, label) LOG_ERR_GOTO(err < 0, msg, label)
+#define UDEV_LOG_ERR_GOTO(err, label, fmt, ...)                                \
+  LOG_ERR_GOTO(err < 0, label, fmt, #__VA_ARGS__)
 
-#define UV_LOG_ERR_GOTO(err, msg, label)                                       \
+#define UV_LOG_ERR_GOTO(err, label, fmt, ...)                                  \
   if (err < 0) {                                                               \
-    LOG_ERR("%s: %s", msg, uv_strerror(err));                                  \
+    LOG_ERR(fmt ": %s", ##__VA_ARGS__, uv_strerror(err));                      \
     goto label;                                                                \
   }
 
@@ -70,29 +72,45 @@ static void encode_object_path(char *path) {
 
 static void power_supply_update_device(power_supply_t *power_supply,
                                        struct udev_device *dev) {
-  struct udev_device *old = power_supply->dev;
-  power_supply->dev = dev;
-
-#define POWER_SUPPLY_UPDATE(prop, get, ...)                                    \
+#define POWER_SUPPLY_UPDATE(prop, newv, iface, get, ...)                       \
   do {                                                                         \
     const char *oldv = get(old, ##__VA_ARGS__);                                \
-    const char *newv = get(dev, ##__VA_ARGS__);                                \
+    newv = get(dev, ##__VA_ARGS__);                                            \
     if (strcmp(oldv, newv) != 0) {                                             \
-      int r = sd_bus_emit_properties_changed(                                  \
-          power_supply->bus, power_supply->by_path_obj_path,                   \
-          DBUS_POWER_SUPPLY_IFACE, prop, DHUB_STRING, newv, NULL);             \
-      SD_LOG_ERR(r, "failed to emit properties changed signal");               \
-      r = sd_bus_emit_properties_changed(                                      \
-          power_supply->bus, power_supply->by_name_obj_path,                   \
-          DBUS_POWER_SUPPLY_IFACE, prop, DHUB_STRING, newv, NULL);             \
-      SD_LOG_ERR(r, "failed to emit properties changed signal");               \
+      LOG_DBG("properties '%s' changed from '%s' to '%s'", prop, oldv, newv);  \
+      int r = sd_bus_emit_properties_changed(power_supply->bus,                \
+                                             power_supply->by_path_obj_path,   \
+                                             iface, prop, NULL);               \
+      SD_LOG_ERR(r,                                                            \
+                 "failed to emit properties changed signal for property '%s' " \
+                 "on object '%s'",                                             \
+                 prop, power_supply->by_path_obj_path);                        \
     }                                                                          \
   } while (0)
 
-  POWER_SUPPLY_UPDATE("Name", udev_device_get_sysname);
-  POWER_SUPPLY_UPDATE("Path", udev_device_get_syspath);
-  POWER_SUPPLY_UPDATE("Type", udev_device_get_property_value,
-                      "POWER_SUPPLY_TYPE");
+  // Update device.
+  struct udev_device *old = power_supply->dev;
+  power_supply->dev = dev;
+
+  // Check for changes and emit signals.
+  const char *newv = NULL;
+  POWER_SUPPLY_UPDATE("Name", newv, DBUS_POWER_SUPPLY_IFACE,
+                      udev_device_get_sysname);
+  POWER_SUPPLY_UPDATE("Path", newv, DBUS_POWER_SUPPLY_IFACE,
+                      udev_device_get_syspath);
+  POWER_SUPPLY_UPDATE("Type", newv, DBUS_POWER_SUPPLY_IFACE,
+                      udev_device_get_property_value, "POWER_SUPPLY_TYPE");
+
+  if (strcmp(newv, "Battery") == 0) {
+    POWER_SUPPLY_UPDATE("Status", newv, DBUS_POWER_SUPPLY_BATTERY_IFACE,
+                        udev_device_get_property_value, "POWER_SUPPLY_STATUS");
+    POWER_SUPPLY_UPDATE("Capacity", newv, DBUS_POWER_SUPPLY_BATTERY_IFACE,
+                        udev_device_get_property_value,
+                        "POWER_SUPPLY_CAPACITY");
+    POWER_SUPPLY_UPDATE("CapacityLevel", newv, DBUS_POWER_SUPPLY_BATTERY_IFACE,
+                        udev_device_get_property_value,
+                        "POWER_SUPPLY_CAPACITY_LEVEL");
+  }
 
 #undef POWER_SUPPLY_UPDATE
 
@@ -181,17 +199,17 @@ static int dbus_get_power_devices(struct sd_bus *bus, const char *path,
 
   // Open array container in reply.
   r = sd_bus_message_open_container(reply, DHUB_ARRAY_CTR, DHUB_STRING);
-  SD_LOG_ERR_GOTO(r, "failed to open reply container", err);
+  SD_LOG_ERR_GOTO(r, err, "failed to open reply container");
 
   tll_foreach(data->power_devices, it) {
     const char *syspath = udev_device_get_syspath(it->item->dev);
     r = sd_bus_message_append(reply, DHUB_STRING, syspath);
-    SD_LOG_ERR_GOTO(r, "failed to append to reply", err);
+    SD_LOG_ERR_GOTO(r, err, "failed to append to reply");
   }
 
   // Close reply array.
   r = sd_bus_message_close_container(reply);
-  SD_LOG_ERR_GOTO(r, "failed to close echo reply", err);
+  SD_LOG_ERR_GOTO(r, err, "failed to close echo reply");
 
   return r;
 
@@ -249,9 +267,16 @@ static power_supply_t *register_power_device(power_data_t *data,
       // Update device.
       power_supply_update_device(it->item, dev);
 
+      power_supply_t *power_supply = it->item;
+
       // Emit DeviceUpdated signal.
       int r = sd_bus_emit_signal(data->bus, DBUS_POWER_PATH, DBUS_POWER_IFACE,
-                                 "DeviceUpdated", DHUB_STRING, syspath);
+                                 "DeviceUpdated", DHUB_OBJ_PATH,
+                                 power_supply->by_path_obj_path);
+      SD_LOG_ERR(r, "failed to emit DeviceUpdated signal");
+      r = sd_bus_emit_signal(data->bus, DBUS_POWER_PATH, DBUS_POWER_IFACE,
+                             "DeviceUpdated", DHUB_OBJ_PATH,
+                             power_supply->by_name_obj_path);
       SD_LOG_ERR(r, "failed to emit DeviceUpdated signal");
 
       return it->item;
@@ -262,6 +287,7 @@ static power_supply_t *register_power_device(power_data_t *data,
 
   power_supply_t *power_supply = calloc(1, sizeof(*power_supply));
   power_supply->dev = dev;
+  power_supply->bus = data->bus;
 
   // /by_path/ object.
   DBUS_ADD_POWER_SUPPLY_FMT(
@@ -404,14 +430,12 @@ static void on_poll_close(uv_handle_t *handle) {
   power_data_t *data = handle->data;
 
   // Free udev monitor.
-  if (data->mon != NULL) {
+  if (data->mon != NULL)
     udev_monitor_unref(data->mon);
-  }
 
   // Free udev context.
-  if (data->udev != NULL) {
+  if (data->udev != NULL)
     udev_unref(data->udev);
-  }
 
   // Free D-Bus slot.
   if (data->slot != NULL)
@@ -442,7 +466,7 @@ void unload(dhub_state_t *dhub, void *mod_data, void *tag) {
 
 int load(dhub_state_t *dhub, void **mod_data) {
   power_data_t *data = calloc(1, sizeof(*data));
-  LOG_ERR_GOTO(data == NULL, "failed to allocate power module data", err);
+  LOG_ERR_GOTO(data == NULL, err, "failed to allocate power module data");
 
   *mod_data = data;
 
@@ -451,25 +475,25 @@ int load(dhub_state_t *dhub, void **mod_data) {
 
   // Create udev context.
   data->udev = udev_new();
-  LOG_ERR_GOTO(data->udev == NULL, "failed to create udev context", err);
+  LOG_ERR_GOTO(data->udev == NULL, err, "failed to create udev context");
 
   // Create udev monitor.
   data->mon = udev_monitor_new_from_netlink(data->udev, "udev");
-  LOG_ERR_GOTO(data->mon == NULL, "failed to create udev monitor", err);
+  LOG_ERR_GOTO(data->mon == NULL, err, "failed to create udev monitor");
 
   // Filter for power supply devices.
   int r = udev_monitor_filter_add_match_subsystem_devtype(data->mon,
                                                           "power_supply", NULL);
   UDEV_LOG_ERR_GOTO(
-      r, "failed to add power_supply subsystem filter to udev monitor", err);
+      r, err, "failed to add power_supply subsystem filter to udev monitor");
 
   // Start monitoring.
   r = udev_monitor_enable_receiving(data->mon);
-  UDEV_LOG_ERR_GOTO(r, "failed to enable receiving on udev monitor", err);
+  UDEV_LOG_ERR_GOTO(r, err, "failed to enable receiving on udev monitor");
 
   // Get monitor fd for polling
   int fd = udev_monitor_get_fd(data->mon);
-  UDEV_LOG_ERR_GOTO(fd, "failed to retrieve udev monitor fd", err);
+  UDEV_LOG_ERR_GOTO(fd, err, "failed to retrieve udev monitor fd");
 
   // Create libuv poll for FD.
   uv_loop_t *loop = dhub_loop(dhub);
@@ -478,19 +502,18 @@ int load(dhub_state_t *dhub, void **mod_data) {
 
   // Poll FD to detect new udev events.
   r = uv_poll_init(loop, &data->mon_poll, fd);
-  UV_LOG_ERR_GOTO(r, "failed to create libuv poll for udev monitor", err);
+  UV_LOG_ERR_GOTO(r, err, "failed to create libuv poll for udev monitor");
 
   // Add object to D-Bus.
   data->bus = dhub_bus(dhub);
-  (void)power_vtable;
   r = sd_bus_add_object_vtable(data->bus, &data->slot, DBUS_POWER_PATH,
                                DBUS_POWER_IFACE, power_vtable, data);
-  SD_LOG_ERR_GOTO(r, "failed to add Power object to D-Bus", err);
+  SD_LOG_ERR_GOTO(r, err, "failed to add Power object to D-Bus");
 
   // Start polling for udev event.
   r = uv_poll_start(&data->mon_poll, UV_READABLE, on_udev_event);
-  UV_LOG_ERR_GOTO(r, "failed to start polling udev monitor libuv poll handle",
-                  err);
+  UV_LOG_ERR_GOTO(r, err,
+                  "failed to start polling udev monitor libuv poll handle");
 
   register_all_power_devices(data);
 

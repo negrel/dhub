@@ -23,6 +23,7 @@ typedef const char *dhub_type_t;
 #define DHUB_UINT64 "t"
 #define DHUB_DOUBLE "d"
 #define DHUB_STRING "s"
+#define DHUB_OBJ_PATH "o"
 #define DHUB_VARIANT "v"
 #define DHUB_ARRAY_CTR 'a'
 #define DHUB_ARRAY(t) "a" t
