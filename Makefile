@@ -1,5 +1,5 @@
-PROJECT_DIR = $(shell git rev-parse --show-toplevel)
-BUILD_DIR := $(PROJECT_DIR)/build
+PROJECT_DIR ?= $(shell git rev-parse --show-toplevel)
+BUILD_DIR ?= $(PROJECT_DIR)/build
 CMD_DIR := $(PROJECT_DIR)/cmd
 MODULES_DIR := $(PROJECT_DIR)/modules
 
